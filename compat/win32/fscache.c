@@ -377,8 +377,9 @@ static struct fsentry *fscache_get(struct fsentry *key)
 /*
  * Enables or disables the cache. Note that the cache is read-only, changes to
  * the working directory are NOT reflected in the cache while enabled.
+ * If explicit_only is set, only explicit call of fscache_lstat uses fscache.
  */
-int fscache_enable(int enable)
+int fscache_enable(int enable, int explicit_only)
 {
 	int result;
 
@@ -396,9 +397,11 @@ int fscache_enable(int enable)
 			: InterlockedDecrement(&enabled);
 
 	if (enable && result == 1) {
-		/* redirect opendir and lstat to the fscache implementations */
-		opendir = fscache_opendir;
-		lstat = fscache_lstat;
+		if (!explicit_only) {
+			/* redirect opendir and lstat to the fscache implementations */
+			opendir = fscache_opendir;
+			lstat = fscache_lstat;
+		}
 	} else if (!enable && !result) {
 		/* reset opendir and lstat to the original implementations */
 		opendir = dirent_opendir;

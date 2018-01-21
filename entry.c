@@ -395,7 +395,7 @@ static int check_path(const char *path, int len, struct stat *st, int skiplen)
 		errno = ENOENT;
 		return -1;
 	}
-	return lstat(path, st);
+	return fscache_lstat(path, st);
 }
 
 /*
