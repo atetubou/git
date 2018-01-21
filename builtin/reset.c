@@ -92,9 +92,9 @@ static int reset_index(const struct object_id *oid, int reset_type, int quiet)
 	}
 	nr++;
 
-	enable_fscache(1);
+	enable_explicit_fscache(1);
 	unpack_result = unpack_trees(nr, desc, &opts);
-	enable_fscache(0);
+	enable_explicit_fscache(0);
 
 	if (unpack_result)
 		goto out;
