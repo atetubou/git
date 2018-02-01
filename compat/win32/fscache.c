@@ -377,8 +377,9 @@ static struct fsentry *fscache_get(struct fsentry *key)
 /*
  * Enables or disables the cache. Note that the cache is read-only, changes to
  * the working directory are NOT reflected in the cache while enabled.
+ * If scope_only is set, only stat call inside fscache scope uses fscache.
  */
-int fscache_enable(int enable)
+int fscache_enable(int enable, int scope_only)
 {
 	int result;
 
@@ -396,9 +397,11 @@ int fscache_enable(int enable)
 			: InterlockedDecrement(&enabled);
 
 	if (enable && result == 1) {
-		/* redirect opendir and lstat to the fscache implementations */
-		opendir = fscache_opendir;
-		lstat = fscache_lstat;
+		if (!scope_only) {
+			/* redirect opendir and lstat to the fscache implementations */
+			opendir = fscache_opendir;
+			lstat = fscache_lstat;
+		}
 	} else if (!enable && !result) {
 		/* reset opendir and lstat to the original implementations */
 		opendir = dirent_opendir;
@@ -409,6 +412,19 @@ int fscache_enable(int enable)
 	}
 	trace_printf_key(&trace_fscache, "fscache: enable(%d)\n", enable);
 	return result;
+}
+
+/*
+ * Open and close scope of enabled fscache.
+ */
+void fscache_scope(int enable) {
+	if (enabled && enable) {
+		opendir = fscache_opendir;
+		lstat = fscache_lstat;
+	} else {
+		opendir = dirent_opendir;
+		lstat = mingw_lstat;
+	}
 }
 
 /*

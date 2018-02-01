@@ -388,6 +388,7 @@ delayed:
 static int check_path(const char *path, int len, struct stat *st, int skiplen)
 {
 	const char *slash = path + len;
+	int result;
 
 	while (path < slash && *slash != '/')
 		slash--;
@@ -395,7 +396,16 @@ static int check_path(const char *path, int len, struct stat *st, int skiplen)
 		errno = ENOENT;
 		return -1;
 	}
-	return lstat(path, st);
+
+	/*
+	 * This lstat is called every file under the target directory of checkout.
+	 * For faster stat, make the result returned from fscache.
+	 */
+	begin_fscache_scope();
+	result = lstat(path, st);
+	end_fscache_scope();
+
+	return result;
 }
 
 /*
