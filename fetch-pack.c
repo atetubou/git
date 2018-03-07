@@ -711,6 +711,14 @@ static void mark_alternate_complete(struct object *obj)
 	mark_complete(&obj->oid);
 }
 
+static int add_loose_objects_to_set(const struct object_id *oid,
+				    const char *path,
+				    void *data)
+{
+	oidset_insert(data, oid);
+	return 0;
+}
+
 static int everything_local(struct fetch_pack_args *args,
 			    struct ref **refs,
 			    struct ref **sought, int nr_sought)
@@ -719,16 +727,26 @@ static int everything_local(struct fetch_pack_args *args,
 	int retval;
 	int old_save_commit_buffer = save_commit_buffer;
 	timestamp_t cutoff = 0;
+	struct oidset loose_oid_set = OIDSET_INIT;
+
+	/* Enumerate all loose objects. */
+	for_each_loose_object(add_loose_objects_to_set, &loose_oid_set, 0);
 
 	save_commit_buffer = 0;
 
 	for (ref = *refs; ref; ref = ref->next) {
 		struct object *o;
+		unsigned int flag = OBJECT_INFO_QUICK;
 
-		if (!has_object_file_with_flags(&ref->old_oid,
-						OBJECT_INFO_QUICK))
+		if (!oidset_contains(&loose_oid_set, &ref->old_oid)) {
+			/* I know this does not exist in the loose form,
+			 * so check if it exists in a non-loose form.
+			 */
+			flag |= OBJECT_INFO_IGNORE_LOOSE;
+		}
+
+		if (!has_object_file_with_flags(&ref->old_oid, flag))
 			continue;
-
 		o = parse_object(&ref->old_oid);
 		if (!o)
 			continue;
@@ -743,6 +761,8 @@ static int everything_local(struct fetch_pack_args *args,
 				cutoff = commit->date;
 		}
 	}
+
+	oidset_clear(&loose_oid_set);
 
 	if (!args->no_dependents) {
 		if (!args->deepen) {
